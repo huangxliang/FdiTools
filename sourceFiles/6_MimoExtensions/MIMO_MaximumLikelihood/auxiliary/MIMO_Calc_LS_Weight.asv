@@ -1,0 +1,64 @@
+function W = MIMO_Calc_LS_Weight(data, G);
+%
+%       Calculates the noise weighting of the linear least squares cost function 
+%
+%   function W = MIMO_Calc_LS_Weight(data, G);
+%
+%
+%   Output
+%
+%       W           =   weighting matrix for the linear least squares cost function
+%                           1 MIMO experiment:   ny x ny x F 
+%                           nu MIMO experiments: ny x ny x nu x F 
+%
+%   Input
+%
+%		data		=	structure containing the non-parametric data required for the identification
+%							data.CY         =	(sample) noise covariance matrix of Y 
+%                                               	1 MIMO experiment:   ny x ny x F 
+%                                                	nu MIMO experiments: ny x ny x nu x F 
+%                           data.CU         =   (sample) noise covariance matrix of U  
+%                                                   1 MIMO experiment:   nu x nu x F 
+%                                                	nu MIMO experiments: nu x nu x nu x F 
+%                           data.CYU        =   (sample) noise covariance matrix of U 
+%                                                	1 MIMO experiment:   ny x nu x F 
+%                                               	nu MIMO experiments: ny x nu x nu x F 
+%
+%                           data.G          =   frequency response matrix, size ny x nu x F 
+%
+%
+%   Rik Pintelon, November 26, 2009
+%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% determine the number of MIMO experiments %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+NumberDim = length(size(data.CY));          % number of matrix dimensions
+if NumberDim == 3
+    NumberExp = 1;                          % number of MIMO experiments
+elseif NumberDim == 4
+    NumberExp = size(data.CY, 3);           % number of MIMO experiments
+end % if
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% calculate the weighting matrix W %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if NumberExp > 1
+    
+    
+    W = zeros(ny, ny, nu, F);
+    dummy = zeros(ny, nu, F);
+    for ee = 1:NumberExp
+        dummy(:,:,:) = data.CYU(:,:,ee,:);
+        W(:,:,ee,:) = data.CY(:,:,ee,:) + Mat_Mult(G), Mat_Mult(squeeze(data.CU(:,:,ee,:)), Conj_Trans(G)) ...
+                      - 2*herm(Mat_Mult(dummy, Conj_Trans(G)));                
+    end % ee, MIMO experiments
+    
+else % one MIMO experiment
+    
+    W = data.CY + Mat_Mult(G, Mat_Mult(data.CU, Conj_Trans(G))) - 2*herm(Mat_Mult(data.CYU, Conj_Trans(G)));       
+    
+end % if more than one MIMO experiment

@@ -1,0 +1,89 @@
+function PolyTrans = MIMO_ML_InvCovOutputError(data, PolyTrans);
+%
+%           Calculates a hermitian symmetric square root of the inverse of 
+%           the covariance matrix of the output error Y-G*U.
+%
+%   function PolyTrans = MIMO_ML_InvCovOutputError(data, PolyTrans);
+%
+%
+%   Output
+%
+%		PolyTrans	=	structure containing the polynomials and transfer functions evaluated in x
+%							PolyTrans.A             =	denominator polynomial plant transfer function evaluated in x.Plant 
+%                                                       size 1 x F 
+%							PolyTrans.G             =	plant transfer matrix evaluated in x.Plant
+%                                                       size ny x nu x F 
+%							PolyTrans.Tg            =	plant transient term evaluated in x.Plant
+%                                                       size ny x F 
+%                           PolyTrans.sqrtCEinv     =   hermitian symmetric square root of the inverse of the covariance of the 
+%                                                       output error (Cov(NY-G*NU)) 
+%
+%   Input
+%
+%		data		=	structure containing the non-parametric data
+%							data.Y                  =	DFT spectrum ny x 1 output signal, size: ny x F 
+%							data.U                  =	DFT spectrum nu x 1 input signal, size: nu x F 
+%							data.freq               =	vector of frequency values (Hz), size: F x 1
+%							data.Ts                 =	sampling time (s)
+%							data.CY                 =	(sample) noise covariance matrix of Y, size: ny x ny x F 
+%                           data.CU                 =   (sample) noise covariance matrix of U, size: nu x nu x F 
+%                           data.CYU                =   (sample) noise covariance matrix of U, size: ny x nu x F 
+%							data.sqrtCYinv          =	CY^(-0.5), size: ny x ny x F 
+%							data.DC                 =	1 if DC present otherwise 0
+%							data.Nyquist            =	1 if Nyquist frequency present otherwise 0
+%
+%		PolyTrans	=	structure containing the polynomials and transfer functions evaluated in x
+%							PolyTrans.A             =	denominator polynomial plant transfer function evaluated in x.Plant 
+%                                                       size 1 x F 
+%							PolyTrans.G             =	plant transfer matrix evaluated in x.Plant
+%                                                       size ny x nu x F 
+%							PolyTrans.Tg            =	plant transient term evaluated in x.Plant
+%                                                       size ny x F 
+%
+% Rik Pintelon, November 2009
+%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% initialisation variables %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+F = length(data.freq);                  % number of frequencies
+ny = size(data.CY, 1);                  % number of outputs
+
+PolyTrans.sqrtCEinv = zeros(ny,ny,F);   % hermitian square root of CEinv 
+CE = zeros(ny,ny);                      % intermediate variable: Cov(NY-G*NU) at a given frequency
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Fast calculation of the covariance Cov(NY-G*NU) of the equation error (NY-G*NU). The lines     %
+% below are equivalent with                                                                      % 
+% for kk = 1:F                                                                                   % 
+%	CE = data.CY(:,:,kk) + PolyTrans.G(:,:,kk) * data.CU(:,:,kk) * PolyTrans.G(:,:,kk)' ...      % 
+%         - 2*herm(data.CYU(:,:,kk) * PolyTrans.G(:,:,kk)');                                     % 
+% end                                                                                            % 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% PolyTrans.sqrtCEinv is used as intermediate variable for CE
+PolyTrans.sqrtCEinv = data.CY + Mat_Mult(Mat_Mult(PolyTrans.G, data.CU), permute(conj(PolyTrans.G), [2,1,3])) ...
+                      - 2*herm(Mat_Mult(data.CYU, permute(conj(PolyTrans.G), [2,1,3])));
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% calculation of CEinv = Cov(Ny-G*NU) and sqrtCEinv %
+% a hermitian square root of CEinv                  %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+for kk = 1:F
+    
+% 	% Cov(NY-G*NU)
+% 	CE = data.CY(:,:,kk) + PolyTrans.G(:,:,kk) * data.CU(:,:,kk) * PolyTrans.G(:,:,kk)' ...
+%          - 2*herm(data.CYU(:,:,kk) * PolyTrans.G(:,:,kk)');
+     
+    % calculate a hermitian square root of the inverse of CE
+    [Uce, Sce, Vce] = svd(CE, 0);
+    [Uce, Sce, Vce] = svd(PolyTrans.sqrtCEinv(:,:,kk), 0);
+    PolyTrans.sqrtCEinv(:,:,kk) = Vce * diag(diag(Sce).^(-0.5)) * Vce';
+    
+end % kk, frequencies
+

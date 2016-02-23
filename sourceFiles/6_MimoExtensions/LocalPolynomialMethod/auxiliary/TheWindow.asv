@@ -1,0 +1,73 @@
+function [y, scale] = TheWindow(N, WindowType);
+%
+%           Calculates a window of the form
+%
+%               y(t) = 1 + alpha * cos(2*pi*t/N) + beta * cos(6*pi*t/N)
+%
+%           with t = 0,1, ..., N-1. According to the choice of alpha and
+%           beta one gets:
+%               - the rectangular window: alpha = beta = 0
+%               - the Hanning window (within a scale factor): alpha = -1, beta = 0 
+%               - the minimum variance window: alpha = beta = -1/2 
+%               - the minimum leakage window: alpha = -9/8, beta = 1/8
+%
+%           Notes:
+%               - the mean value of the time domain signals should be removed 
+%                 before applying the time domain window 
+%               - to recover the correct Fourier coefficients of periodic signals, the DFT
+%                 should be divided by lambda1 = sum(y)
+%               - to preserve the variance of random signals the DFT should
+%                 be divided by lambda2 = sqrt(sum(y.^2))
+%               - the SNR of measuring the Fourier coefficients is
+%                 decreased by the factor sqrt(N)*lambda2/lambda1
+%
+%   function [y, scale] = TheWindow(N, WindowType);
+%
+%
+%   Output
+%
+%       y           =   window
+%       scale       =   struct('period', 'rand', 'snr')
+%                           scale.period    :   scale factor DFT to recover the correct Fourier coefficients
+%                                               of periodic signals 
+%                           scale.rand      :   scale factor DFT to recover the correct variance of random signals
+%                           scale.snr       :   factor giving the decrease in signal-to-noise ratio of the measured 
+%                                               Fourier coeffients
+%
+%   Input
+%
+%       N           =   number of time domain samples
+%       WindowType  =   'rect'  :   rectangular window
+%                       'hann'  :	hanning window
+%                       'mvar   : 	minimum variance window
+%                       'mleak' :   minimum leakage window
+%
+% Rik Pintelon, 6 februari 2009 
+%
+
+% intitialisation variables
+scale = struct(
+
+switch WindowType
+    
+    case 'rect'
+        alpha = 0;
+        beta = 0;
+        
+    case 'hann'
+        alpha = -1;
+        beta = 0;
+        
+    case 'mvar'
+        alpha = -1/2;
+        beta = -1/2;
+        
+    case 'mleak'
+        alpha = -9/8;
+        beta = 1/8;
+    
+end % switch
+
+t = [0:1:N-1];
+y = 1 + alpha * cos(2*pi*t/N) + beta * cos(6*pi*t/N);
+

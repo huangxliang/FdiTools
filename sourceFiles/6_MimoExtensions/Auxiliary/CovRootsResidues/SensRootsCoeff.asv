@@ -1,0 +1,107 @@
+function [S_RootsCoeff, TheRoots] = SensRootsCoeff(Coeff, ThePlane);
+%
+%   [S_RootsCoeff, TheRoots] = SensRootsCoeff(Coeff, ThePlane);
+%
+%
+%       Calculates the sensitivity matrix of the roots of a polynomial w.r.t. its coefficients
+%
+%               Coeff(1) + Coeff(2)*x + Coeff(3) * x^2 + ... + Coeff(nx+1) x^nx
+%
+%       s-, sqrt(s)-domain  :   x = s, sqrt(s), and Coeff(nx+1) = 1
+%       z-domain            :   x = z^-1,       and Coeff(1) = 1
+%
+%
+%   OUTPUT PARAMETER
+%
+%       S_RootsCoeff    =   sensitivity of the roots w.r.t. the polynomial coefficients; size (number of roots) x number of coefficients
+%
+%       TheRoots        =   roots of the polynomial; size (number of roots) x 1
+%
+%
+%   INPUT PARAMETERS
+%
+%       Coeff           =   coefficients of a monic polynomial in increasing powers of s, sqrt(s), or z^-1; size 1 x (1 + order polynomial)
+%                               z-domain            :   Coeff(1) = 1
+%                               s-, sqrt(s)-domain  :   Coeff(end) = 1
+%                       note: in s, sqrt(s)-domain Coeff are the frequency normalised polynomial coefficients
+%
+%       ThePlane    =   domain of the polynomial
+%						    's':	continuous-time;
+%						    'w':	sqrt(s)-domain
+%						    'z':	discrete-time;
+%
+%   Rik Pintelon, January 2006
+%   version XX
+%
+
+
+%%%%%%%%%%%%%%%%%%
+% initialisation %
+%%%%%%%%%%%%%%%%%%
+
+% coefficient that is set to one in the monic polynomial is known
+switch ThePlane
+    case {'s', 'w'}
+        Sel(end) = 0;
+    case 'z'
+        Sel(1) = 0;
+end
+
+% order polynomial
+nn = length(Coeff) - 1;
+
+% number of estimated coefficients
+ntheta = sum(Sel);
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Sensitivity of the roots w.r.t. the estimated polynomial coefficients %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% calculation of the roots
+% in the z-domain 1/TheRoots is calculated
+TheRoots = roots(fliplr(Coeff)).';
+
+% coefficient of the differentiated polynomial
+dCoeff = [1:nn];
+dCoeff = Coeff(2:end) .* dCoeff;
+
+% differentiated polynomial evaluated in the roots of the original polynomial
+dPoly = polyval(fliplr(dCoeff), TheRoots);
+
+% table containing the powers of the roots
+PowerRoots = zeros(nn, length(Sel));
+for ii = 1:ntheta+1
+    PowerRoots(:, ii) = TheRoots.^(ii-1);    
+end
+
+% sensitivity matrix of the roots w.r.t. the estimated polynomial coefficients
+switch ThePlane
+    case {'s', 'w'}
+        S_RootsCoeff = - PowerRoots(:, Sel == 1) ./ repmat(dPoly, 1, ntheta);
+    case 'z'
+        S_RootsCoeff = PowerRoots(:, Sel == 1) ./ repmat(dPoly .* TheRoots.^2, 1, ntheta);
+end
+ 
+% roots in z-domain
+if ThePlane == 'z'
+    TheRoots = 1./TheRoots;    
+end
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Calculation of the covariance matrices of the roots %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Covariance matrix of all the roots
+Croots.all = zeros(2*nn, ntheta);
+Sall = [real(S_RootsCoeff); imag(S_RootsCoeff)];
+Croots.all = Sall * CovCoeff * Sall.';
+
+% Covariance matrix of each root seperately
+Croots.root = zeros(2, 2, nn);
+for ii = 1:nn
+    Sroot = [real(Sall(ii, :)); imag(Sall(ii, :))];
+    Croots.root(:, :, ii) = Sroot * CovCoeff * Sroot.';    
+end
